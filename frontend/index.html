@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Voice Comparator</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    fieldset { margin: 20px 0; padding: 15px; }
+    label { display: block; margin: 10px 0 5px; }
+    button { margin-top: 10px; }
+  </style>
+</head>
+<body>
+
+<h2>🎙️ Voice Comparison Tool</h2>
+
+<form id="voiceForm">
+  <fieldset>
+    <legend>Voice 1</legend>
+    <label><input type="radio" name="input1Type" value="file" checked> Upload File</label>
+    <input type="file" id="fileInput1" accept=".wav">
+    <label><input type="radio" name="input1Type" value="mic"> Record with Microphone</label>
+    <button type="button" onclick="record(1)">🎤 Record Voice 1</button>
+    <span id="recStatus1"></span>
+  </fieldset>
+
+  <fieldset>
+    <legend>Voice 2</legend>
+    <label><input type="radio" name="input2Type" value="file" checked> Upload File</label>
+    <input type="file" id="fileInput2" accept=".wav">
+    <label><input type="radio" name="input2Type" value="mic"> Record with Microphone</label>
+    <button type="button" onclick="record(2)">🎤 Record Voice 2</button>
+    <span id="recStatus2"></span>
+  </fieldset>
+
+  <button type="submit" id="compareBtn" disabled>Compare</button>
+</form>
+
+<div id="result" style="margin-top:20px;"></div>
+
+<script>
+let recorder, chunks = [];
+let blob1 = null, blob2 = null;
+
+function record(slot) {
+  navigator.mediaDevices.getUserMedia({ audio: true })
+    .then(stream => {
+      chunks = [];
+      recorder = new MediaRecorder(stream);
+      recorder.ondataavailable = e => chunks.push(e.data);
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: "audio/wav" });
+        if (slot === 1) {
+          blob1 = blob;
+          document.getElementById('recStatus1').textContent = "🎧 Voice 1 Recorded!";
+        } else {
+          blob2 = blob;
+          document.getElementById('recStatus2').textContent = "🎧 Voice 2 Recorded!";
+        }
+        checkReady();
+      };
+      recorder.start();
+      setTimeout(() => recorder.stop(), 4000);
+    })
+    .catch(err => alert("Microphone access denied: " + err));
+}
+
+function checkReady() {
+  const input1 = document.querySelector('input[name="input1Type"]:checked').value;
+  const input2 = document.querySelector('input[name="input2Type"]:checked').value;
+
+  const ready1 = (input1 === "mic" && blob1) || (input1 === "file" && document.getElementById("fileInput1").files.length > 0);
+  const ready2 = (input2 === "mic" && blob2) || (input2 === "file" && document.getElementById("fileInput2").files.length > 0);
+
+  document.getElementById("compareBtn").disabled = !(ready1 && ready2);
+}
+
+document.querySelectorAll('input[type="file"], input[type="radio"]').forEach(el => {
+  el.addEventListener('change', checkReady);
+});
+
+document.getElementById("voiceForm").onsubmit = e => {
+  e.preventDefault();
+
+  const input1Type = document.querySelector('input[name="input1Type"]:checked').value;
+  const input2Type = document.querySelector('input[name="input2Type"]:checked').value;
+  const file1 = input1Type === "mic" ? blob1 : document.getElementById("fileInput1").files[0];
+  const file2 = input2Type === "mic" ? blob2 : document.getElementById("fileInput2").files[0];
+
+  const formData = new FormData();
+  formData.append("file1", file1, "voice1.wav");
+  formData.append("file2", file2, "voice2.wav");
+
+  fetch("http://localhost:8000/compare_voices/", {
+    method: "POST",
+    body: formData
+  })
+  .then(res => res.json())
+  .then(data => {
+    document.getElementById("result").innerHTML =
+      `<h3>🎯 Similarity: ${data.similarity_score}</h3>` +
+      `<strong>${data.same_speaker ? "✅ Same speaker" : "❌ Different speakers"}</strong>`;
+  })
+  .catch(err => alert("Error comparing voices: " + err));
+};
+</script>
+
+</body>
+</html>

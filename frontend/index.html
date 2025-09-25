@@ -1,154 +1,83 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Give a Voice Banana 🍌</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      max-width: 700px;
-      margin: 40px auto;
-      padding: 20px;
-      border: 2px solid #ccc;
-      border-radius: 8px;
-    }
-    h1 {
-      text-align: center;
-    }
-    .sample-box {
-      margin-bottom: 30px;
-      padding: 15px;
-      border: 1px solid #aaa;
-      border-radius: 6px;
-    }
-    button {
-      padding: 8px 16px;
-      margin-top: 10px;
-      margin-right: 10px;
-    }
-    audio {
-      display: block;
-      margin-top: 10px;
-    }
-    #result {
-      margin-top: 20px;
-      padding: 10px;
-      background: #f0f0f0;
-      border-radius: 6px;
-      font-family: monospace;
-    }
-  </style>
+  <meta charset="UTF-8">
+  <title>Give a Voice Banana</title>
 </head>
 <body>
-  <h1>🎤 Give a Voice Banana</h1>
+  <h1>🎤 Voice Comparison Tool</h1>
 
-  <form id="uploadForm">
-    <!-- Sample 1 -->
-    <div class="sample-box">
-      <h3>Sample 1</h3>
-      <input type="file" name="file1" accept=".wav" id="file1" /><br />
-      <button type="button" onclick="record('1')">🎙️ Record Sample 1</button>
-      <audio id="player1" controls></audio>
-    </div>
+  <div>
+    <button onclick="startRecording(1)">🎙️ Record Voice 1</button>
+    <button onclick="stopRecording(1)">⏹️ Stop</button>
+    <audio id="player1" controls></audio>
+  </div>
 
-    <!-- Sample 2 -->
-    <div class="sample-box">
-      <h3>Sample 2</h3>
-      <input type="file" name="file2" accept=".wav" id="file2" /><br />
-      <button type="button" onclick="record('2')">🎙️ Record Sample 2</button>
-      <audio id="player2" controls></audio>
-    </div>
+  <div>
+    <button onclick="startRecording(2)">🎙️ Record Voice 2</button>
+    <button onclick="stopRecording(2)">⏹️ Stop</button>
+    <audio id="player2" controls></audio>
+  </div>
 
-    <button type="submit">🧠 Compare Voices</button>
-  </form>
+  <button onclick="upload()">🚀 Compare Voices</button>
 
-  <div id="result"></div>
+  <h2 id="result">Similarity: ...</h2>
 
   <script>
-    let mediaRecorder;
-    let chunks = [];
-    let currentField = "";
+    let mediaRecorder1, mediaRecorder2;
+    let chunks1 = [], chunks2 = [];
 
-    function record(fieldNum) {
-      currentField = fieldNum;
-
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        alert("🎙️ Microphone access not supported.");
-        return;
-      }
-
+    function startRecording(num) {
       navigator.mediaDevices.getUserMedia({ audio: true })
         .then(stream => {
-          mediaRecorder = new MediaRecorder(stream);
-          chunks = [];
-
-          mediaRecorder.ondataavailable = e => {
-            chunks.push(e.data);
+          const recorder = new MediaRecorder(stream);
+          if (num === 1) {
+            mediaRecorder1 = recorder;
+            chunks1 = [];
+          } else {
+            mediaRecorder2 = recorder;
+            chunks2 = [];
+          }
+          recorder.ondataavailable = e => {
+            if (num === 1) chunks1.push(e.data);
+            else chunks2.push(e.data);
           };
-
-          mediaRecorder.onstop = () => {
-            const blob = new Blob(chunks, { type: "audio/wav" });
-            const file = new File([blob], `recording${fieldNum}.wav`, { type: "audio/wav" });
-
-            const audioPlayer = document.getElementById(`player${fieldNum}`);
-            audioPlayer.src = URL.createObjectURL(blob);
-
-            // Replace the file input with our recorded file
-            const dt = new DataTransfer();
-            dt.items.add(file);
-            document.getElementById(`file${fieldNum}`).files = dt.files;
+          recorder.onstop = () => {
+            const blob = new Blob(num === 1 ? chunks1 : chunks2, { type: 'audio/wav' });
+            const audioURL = URL.createObjectURL(blob);
+            document.getElementById(`player${num}`).src = audioURL;
+            document.getElementById(`player${num}`).blob = blob;
           };
-
-          mediaRecorder.start();
-
-          setTimeout(() => {
-            mediaRecorder.stop();
-            stream.getTracks().forEach(track => track.stop());
-          }, 3000); // Record 3 seconds
-        })
-        .catch(err => {
-          alert("Microphone access denied.");
-          console.error(err);
+          recorder.start();
         });
     }
 
-    // Upload form handler
-    const form = document.getElementById('uploadForm');
-    const result = document.getElementById('result');
+    function stopRecording(num) {
+      if (num === 1 && mediaRecorder1) mediaRecorder1.stop();
+      if (num === 2 && mediaRecorder2) mediaRecorder2.stop();
+    }
 
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
+    async function upload() {
+      const blob1 = document.getElementById("player1").blob;
+      const blob2 = document.getElementById("player2").blob;
 
-      const formData = new FormData();
-      const file1 = document.getElementById("file1").files[0];
-      const file2 = document.getElementById("file2").files[0];
-
-      if (!file1 || !file2) {
-        result.innerHTML = "❌ Please provide both voice samples.";
+      if (!blob1 || !blob2) {
+        alert("Please record both samples first.");
         return;
       }
 
-      formData.append("file1", file1);
-      formData.append("file2", file2);
+      const formData = new FormData();
+      formData.append("file1", blob1, "voice1.wav");
+      formData.append("file2", blob2, "voice2.wav");
 
-      result.innerHTML = "⏳ Processing...";
+      const res = await fetch("/compare", {
+        method: "POST",
+        body: formData
+      });
 
-      try {
-        const response = await fetch("/compare", {
-          method: "POST",
-          body: formData
-        });
-
-        if (!response.ok) {
-          throw new Error("Server error");
-        }
-
-        const data = await response.json();
-        result.innerHTML = "<strong>✅ Result:</strong><br>" + JSON.stringify(data);
-      } catch (err) {
-        result.innerHTML = "❌ Error: " + err.message;
-      }
-    });
+      const data = await res.json();
+      document.getElementById("result").innerText = `Similarity: ${data.similarity}`;
+    }
   </script>
 </body>
 </html>

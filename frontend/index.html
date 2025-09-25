@@ -2,12 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Give a Voice Banana</title>
+  <title>Give a Voice Banana 🍌</title>
   <style>
     body {
       font-family: sans-serif;
-      max-width: 600px;
-      margin: 50px auto;
+      max-width: 700px;
+      margin: 40px auto;
       padding: 20px;
       border: 2px solid #ccc;
       border-radius: 8px;
@@ -15,14 +15,20 @@
     h1 {
       text-align: center;
     }
-    input[type="file"] {
-      display: block;
-      margin-bottom: 15px;
+    .sample-box {
+      margin-bottom: 30px;
+      padding: 15px;
+      border: 1px solid #aaa;
+      border-radius: 6px;
     }
     button {
-      padding: 10px 20px;
-      font-size: 16px;
-      cursor: pointer;
+      padding: 8px 16px;
+      margin-top: 10px;
+      margin-right: 10px;
+    }
+    audio {
+      display: block;
+      margin-top: 10px;
     }
     #result {
       margin-top: 20px;
@@ -34,30 +40,98 @@
   </style>
 </head>
 <body>
-  <h1>🔊 Give a Voice Banana</h1>
+  <h1>🎤 Give a Voice Banana</h1>
 
   <form id="uploadForm">
-    <label>Select Voice File 1:</label>
-    <input type="file" name="file1" accept=".wav" required />
+    <!-- Sample 1 -->
+    <div class="sample-box">
+      <h3>Sample 1</h3>
+      <input type="file" name="file1" accept=".wav" id="file1" /><br />
+      <button type="button" onclick="record('1')">🎙️ Record Sample 1</button>
+      <audio id="player1" controls></audio>
+    </div>
 
-    <label>Select Voice File 2:</label>
-    <input type="file" name="file2" accept=".wav" required />
+    <!-- Sample 2 -->
+    <div class="sample-box">
+      <h3>Sample 2</h3>
+      <input type="file" name="file2" accept=".wav" id="file2" /><br />
+      <button type="button" onclick="record('2')">🎙️ Record Sample 2</button>
+      <audio id="player2" controls></audio>
+    </div>
 
-    <button type="submit">Compare Voices</button>
+    <button type="submit">🧠 Compare Voices</button>
   </form>
 
   <div id="result"></div>
 
   <script>
+    let mediaRecorder;
+    let chunks = [];
+    let currentField = "";
+
+    function record(fieldNum) {
+      currentField = fieldNum;
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert("🎙️ Microphone access not supported.");
+        return;
+      }
+
+      navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(stream => {
+          mediaRecorder = new MediaRecorder(stream);
+          chunks = [];
+
+          mediaRecorder.ondataavailable = e => {
+            chunks.push(e.data);
+          };
+
+          mediaRecorder.onstop = () => {
+            const blob = new Blob(chunks, { type: "audio/wav" });
+            const file = new File([blob], `recording${fieldNum}.wav`, { type: "audio/wav" });
+
+            const audioPlayer = document.getElementById(`player${fieldNum}`);
+            audioPlayer.src = URL.createObjectURL(blob);
+
+            // Replace the file input with our recorded file
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            document.getElementById(`file${fieldNum}`).files = dt.files;
+          };
+
+          mediaRecorder.start();
+
+          setTimeout(() => {
+            mediaRecorder.stop();
+            stream.getTracks().forEach(track => track.stop());
+          }, 3000); // Record 3 seconds
+        })
+        .catch(err => {
+          alert("Microphone access denied.");
+          console.error(err);
+        });
+    }
+
+    // Upload form handler
     const form = document.getElementById('uploadForm');
     const result = document.getElementById('result');
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
 
-      const formData = new FormData(form);
+      const formData = new FormData();
+      const file1 = document.getElementById("file1").files[0];
+      const file2 = document.getElementById("file2").files[0];
 
-      result.innerHTML = "Processing...";
+      if (!file1 || !file2) {
+        result.innerHTML = "❌ Please provide both voice samples.";
+        return;
+      }
+
+      formData.append("file1", file1);
+      formData.append("file2", file2);
+
+      result.innerHTML = "⏳ Processing...";
 
       try {
         const response = await fetch("/compare", {
@@ -70,7 +144,7 @@
         }
 
         const data = await response.json();
-        result.innerHTML = "<strong>Result:</strong><br>" + JSON.stringify(data);
+        result.innerHTML = "<strong>✅ Result:</strong><br>" + JSON.stringify(data);
       } catch (err) {
         result.innerHTML = "❌ Error: " + err.message;
       }

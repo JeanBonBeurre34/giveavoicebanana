@@ -1,54 +1,45 @@
---- main.py ---
-from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-import os
+import numpy as np
+import librosa
+from fastapi import FastAPI, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
+from scipy.spatial.distance import cosine
 import tempfile
-import subprocess
-from compare import compare_voices
-
+import shutil
 
 app = FastAPI()
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# Serve static files from /frontend
-app.mount("/static", StaticFiles(directory="frontend"), name="static")
+def extract_features(path):
+    y, sr = librosa.load(path, sr=16000)
+    mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)
+    return np.mean(mfcc, axis=1)
 
-
-@app.get("/")
-def serve_index():
-return FileResponse("frontend/index.html")
-
+def compare_voice(file1_path, file2_path):
+    try:
+        mfcc1 = extract_features(file1_path)
+        mfcc2 = extract_features(file2_path)
+        similarity = 1 - cosine(mfcc1, mfcc2)
+        return round(float(similarity), 3)
+    except Exception as e:
+        print(f"[ERROR] Voice comparison failed: {e}")
+        return 0.0
 
 @app.post("/compare")
 async def compare(file1: UploadFile = File(...), file2: UploadFile = File(...)):
-with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as tmp1:
-tmp1.write(await file1.read())
-path1 = tmp1.name
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp1:
+        shutil.copyfileobj(file1.file, tmp1)
+        tmp1_path = tmp1.name
 
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp2:
+        shutil.copyfileobj(file2.file, tmp2)
+        tmp2_path = tmp2.name
 
-with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as tmp2:
-tmp2.write(await file2.read())
-path2 = tmp2.name
-
-
-try:
-wav1 = path1 + ".wav"
-wav2 = path2 + ".wav"
-subprocess.run(["ffmpeg", "-y", "-i", path1, wav1], check=True)
-subprocess.run(["ffmpeg", "-y", "-i", path2, wav2], check=True)
-similarity = compare_voices(wav1, wav2)
-return {"similarity": similarity}
-
-
-except subprocess.CalledProcessError as e:
-raise HTTPException(status_code=500, detail=f"Audio conversion failed: {e}")
-
-
-finally:
-for f in [path1, path2, wav1, wav2]:
-try:
-os.remove(f)
-except:
-pass
-
+    similarity = compare_voice(tmp1_path, tmp2_path)
+    return {"similarity": similarity}

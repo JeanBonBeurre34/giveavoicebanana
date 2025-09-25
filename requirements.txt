@@ -3,4 +3,5 @@ uvicorn==0.23.2
 numpy
 scipy
 pydub
+librosa
 python-multipart

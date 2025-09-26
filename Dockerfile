@@ -1,14 +1,12 @@
-FROM python:3.11-slim
+FROM python:3.10-slim
 
 WORKDIR /app
 
+# Dependencies for audio processing
 COPY requirements.txt .
-RUN apt-get update && apt-get install -y ffmpeg gcc libsndfile1 \
- && pip install --no-cache-dir -r requirements.txt \
- && apt-get clean
+RUN apt-get update && apt-get install -y ffmpeg \
+    && pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY main.py .
 
-EXPOSE 80
-
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "80"]
+CMD ["python", "main.py"]

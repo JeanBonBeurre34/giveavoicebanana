@@ -2,9 +2,9 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# Dependencies for audio processing
+# Install system deps: ffmpeg for audio, build-essential for gcc
 COPY requirements.txt .
-RUN apt-get update && apt-get install -y ffmpeg \
+RUN apt-get update && apt-get install -y ffmpeg build-essential \
     && pip install --no-cache-dir -r requirements.txt
 
 COPY main.py .

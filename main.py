@@ -8,7 +8,6 @@ import numpy as np
 from fastapi import FastAPI, UploadFile, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 import uvicorn
 
 from resemblyzer import VoiceEncoder, preprocess_wav
@@ -21,9 +20,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Mount static folder for OG images, favicon, etc.
-app.mount("/static", StaticFiles(directory="static"), name="static")
 
 encoder = VoiceEncoder()
 
@@ -104,14 +100,14 @@ def frontend():
   <meta property="og:url" content="https://doyoutrustmyvoice.com/">
   <meta property="og:title" content="Do You Trust My Voice? | Voice Comparison & Deepfake Prevention">
   <meta property="og:description" content="Verify voices and prevent deepfakes with our AI-powered voice comparison tool. Upload or record two voices and check if they match. GDPR compliant.">
-  <meta property="og:image" content="https://doyoutrustmyvoice.com/static/og-image.png">
+  <meta property="og:image" content="https://doyoutrustmyvoice.com/og-image.png">
 
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:url" content="https://doyoutrustmyvoice.com/">
   <meta name="twitter:title" content="Do You Trust My Voice? | Voice Comparison & Deepfake Prevention">
   <meta name="twitter:description" content="Verify voices and prevent deepfakes with our AI-powered voice comparison tool. Upload or record two voices and check if they match. GDPR compliant.">
-  <meta name="twitter:image" content="https://doyoutrustmyvoice.com/static/og-image.png">
+  <meta name="twitter:image" content="https://doyoutrustmyvoice.com/og-image.png">
 
   <!-- Structured Data for Google -->
   <script type="application/ld+json">

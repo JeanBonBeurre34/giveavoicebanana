@@ -129,6 +129,8 @@ def frontend():
   <div id="result"></div>
 
 <script>
+const recorders = {}; // holds recorder + file per id
+
 function pickMime() {
   if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) return {mime:"audio/webm;codecs=opus", ext:".webm"};
   if (MediaRecorder.isTypeSupported("audio/ogg;codecs=opus")) return {mime:"audio/ogg;codecs=opus", ext:".ogg"};
@@ -144,7 +146,7 @@ function startRecording(id) {
     rec.onstop = () => {
       const blob = new Blob(chunks, { type: mime || chunks[0].type });
       const file = new File([blob], id + ext, { type: blob.type });
-      document.getElementById(id).file = file;
+      recorders[id] = { file };
 
       const audio = document.createElement("audio");
       audio.controls = true;
@@ -157,23 +159,23 @@ function startRecording(id) {
       stream.getTracks().forEach(t => t.stop());
     };
     rec.start();
-    document.getElementById(id).recorder = rec;
+    recorders[id] = {recorder: rec};
   }).catch(err => {
     alert("Mic error: " + err);
   });
 }
 
 function stopRecording(id) {
-  const rec = document.getElementById(id).recorder;
-  if (rec) {
-    rec.requestData();
-    rec.stop();
+  const r = recorders[id]?.recorder;
+  if (r) {
+    r.requestData();
+    r.stop();
   }
 }
 
 async function submitForm() {
-  let f1 = document.getElementById("file1").files[0] || document.getElementById("rec1").file;
-  let f2 = document.getElementById("file2").files[0] || document.getElementById("rec2").file;
+  let f1 = document.getElementById("file1").files[0] || recorders["rec1"]?.file;
+  let f2 = document.getElementById("file2").files[0] || recorders["rec2"]?.file;
   if (!f1 || !f2) {
     alert("Please provide both samples.");
     return;

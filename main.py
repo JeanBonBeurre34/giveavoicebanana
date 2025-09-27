@@ -99,6 +99,9 @@ def frontend():
       color: #333;
       margin: 0;
       padding: 0;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
     }
     header {
       background: linear-gradient(90deg, #4f46e5, #3b82f6);
@@ -106,89 +109,19 @@ def frontend():
       padding: 2rem 1rem;
       text-align: center;
     }
-    header h1 { margin: 0; font-size: 2rem; }
-    header p { margin: 0.5rem 0 0; }
-
-    main {
-      max-width: 800px;
-      margin: 1.5rem auto;
-      padding: 0 1rem;
-    }
-
-    .info {
-      background: #eef2ff;
-      border-left: 4px solid #4f46e5;
-      padding: 1rem;
-      border-radius: 8px;
-      margin-bottom: 2rem;
-    }
-    .info h2 { margin-top: 0; }
-
-    .card {
-      background: white;
-      border-radius: 12px;
-      padding: 1.5rem;
-      margin-bottom: 1.5rem;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    }
-
-    .card h3 { margin-top: 0; }
+    main { flex: 1; max-width: 800px; margin: 1.5rem auto; padding: 0 1rem; }
+    .info { background: #eef2ff; border-left: 4px solid #4f46e5; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; }
+    .card { background: white; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
     input[type="file"] { margin-bottom: 0.8rem; }
-
-    button {
-      background: #4f46e5;
-      border: none;
-      color: white;
-      padding: 0.6rem 1.2rem;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: background 0.2s;
-      margin: 0.3rem 0.3rem 0.3rem 0;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.3rem;
-    }
+    button { background: #4f46e5; border: none; color: white; padding: 0.6rem 1.2rem; border-radius: 8px; cursor: pointer; margin: 0.3rem; display: inline-flex; align-items: center; gap: 0.3rem; }
     button:hover { background: #4338ca; }
-
     audio { margin-top: 0.8rem; display: block; }
     .status { margin-left: 0.5rem; font-style: italic; color: #555; }
-
-    /* Overlay modal */
-    #overlay {
-      position: fixed;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      background: rgba(0,0,0,0.7);
-      display: none;
-      justify-content: center;
-      align-items: center;
-      z-index: 1000;
-    }
-    #overlay-content {
-      background: white;
-      padding: 2rem;
-      border-radius: 12px;
-      text-align: center;
-      max-width: 400px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-    }
-    #overlay h2 { margin-top: 0; }
-    #overlay button {
-      margin-top: 1rem;
-      background: #3b82f6;
-    }
-
-    /* Result colors */
-    .great { color: green; }
-    .match { color: orange; }
-    .nomatch { color: red; }
-
-    /* Responsive design */
-    @media (max-width: 600px) {
-      header h1 { font-size: 1.5rem; }
-      .card { padding: 1rem; }
-      button { width: 100%; margin-bottom: 0.6rem; justify-content: center; }
-    }
+    #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 1000; }
+    #overlay-content { background: white; padding: 2rem; border-radius: 12px; text-align: center; max-width: 400px; }
+    footer { background: #f1f5f9; padding: 1rem; font-size: 0.8rem; text-align: center; color: #555; }
+    .great { color: green; } .match { color: orange; } .nomatch { color: red; }
+    @media (max-width: 600px) { button { width: 100%; margin-bottom: 0.6rem; justify-content: center; } }
   </style>
 </head>
 <body>
@@ -201,33 +134,29 @@ def frontend():
     <section class="info">
       <h2>ℹ️ How it works</h2>
       <ol>
-        <li>📂 <strong>Provide two samples:</strong> either upload an audio file or record your voice directly with the microphone.</li>
-        <li>🎤 <strong>Record if needed:</strong> use the Start/Stop buttons to capture live audio.</li>
-        <li>📊 <strong>Compare:</strong> click the “Compare Voices” button.</li>
-        <li>✅❌ <strong>View results:</strong> similarity score + verdict displayed in an overlay.</li>
+        <li>📂 Provide two samples: upload a file or record your voice.</li>
+        <li>🎤 Record if needed: Start/Stop to capture audio.</li>
+        <li>📊 Compare: click “Compare Voices”.</li>
+        <li>✅❌ View results: similarity score + verdict displayed in overlay.</li>
       </ol>
-      <p><strong>Supported file types:</strong> WAV, MP3, OGG, WEBM, and most browser-recorded formats.</p>
+      <p><strong>Supported formats:</strong> WAV, MP3, OGG, WEBM.</p>
     </section>
 
     <div class="card">
       <h3>Sample 1</h3>
       <input type="file" id="file1" accept="audio/*"><br>
-      <div style="margin-top: 0.5rem;">
-        <button onclick="startRecording('rec1')">🎤 Start Recording</button>
-        <button onclick="stopRecording('rec1')">⏹ Stop Recording</button>
-        <span id="rec1-status" class="status"></span>
-      </div>
+      <button onclick="startRecording('rec1')">🎤 Start Recording</button>
+      <button onclick="stopRecording('rec1')">⏹ Stop Recording</button>
+      <span id="rec1-status" class="status"></span>
       <div id="rec1-preview"></div>
     </div>
 
     <div class="card">
       <h3>Sample 2</h3>
       <input type="file" id="file2" accept="audio/*"><br>
-      <div style="margin-top: 0.5rem;">
-        <button onclick="startRecording('rec2')">🎤 Start Recording</button>
-        <button onclick="stopRecording('rec2')">⏹ Stop Recording</button>
-        <span id="rec2-status" class="status"></span>
-      </div>
+      <button onclick="startRecording('rec2')">🎤 Start Recording</button>
+      <button onclick="stopRecording('rec2')">⏹ Stop Recording</button>
+      <span id="rec2-status" class="status"></span>
       <div id="rec2-preview"></div>
     </div>
 
@@ -244,6 +173,10 @@ def frontend():
       <button id="overlay-close" style="display:none;" onclick="closeOverlay()">Close</button>
     </div>
   </div>
+
+  <footer>
+    <p>⚖️ <a href="/privacy" target="_blank">Privacy & Legal Disclaimer</a></p>
+  </footer>
 
 <script>
 const recorders = {};
@@ -281,22 +214,16 @@ function startRecording(id) {
       preview.innerHTML = "";
       preview.appendChild(audio);
 
-      console.log("Recorded:", file.name, file.type, file.size);
       stream.getTracks().forEach(t => t.stop());
     };
     rec.start();
     recorders[id] = {recorder: rec};
-  }).catch(err => {
-    alert("Mic error: " + err);
-  });
+  }).catch(err => alert("Mic error: " + err));
 }
 
 function stopRecording(id) {
   const r = recorders[id]?.recorder;
-  if (r) {
-    r.requestData();
-    r.stop();
-  }
+  if (r) { r.requestData(); r.stop(); }
 }
 
 function interpretScore(score) {
@@ -305,7 +232,7 @@ function interpretScore(score) {
   return {text: "❌ No match", cls: "nomatch"};
 }
 
-function openOverlay(message="⏳ Comparing…", sub="Please wait while we analyze the voices.") {
+function openOverlay(message="⏳ Comparing…", sub="Please wait...") {
   document.getElementById("overlay-title").innerText = message;
   document.getElementById("overlay-text").innerText = sub;
   document.getElementById("overlay-close").style.display = "none";
@@ -326,10 +253,7 @@ function closeOverlay() {
 async function submitForm() {
   let f1 = document.getElementById("file1").files[0] || recorders["rec1"]?.file;
   let f2 = document.getElementById("file2").files[0] || recorders["rec2"]?.file;
-  if (!f1 || !f2) {
-    alert("Please provide both samples.");
-    return;
-  }
+  if (!f1 || !f2) { alert("Please provide both samples."); return; }
 
   openOverlay();
 
@@ -350,6 +274,36 @@ async function submitForm() {
   }
 }
 </script>
+</body>
+</html>
+    """
+
+
+@app.get("/privacy", response_class=HTMLResponse)
+def privacy():
+    return """
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Privacy & Legal Disclaimer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2rem; line-height: 1.6; }
+    h1 { color: #4f46e5; }
+  </style>
+</head>
+<body>
+  <h1>Privacy & Legal Disclaimer</h1>
+  <p>This service processes audio data strictly for the purpose of voice similarity comparison.</p>
+  <ul>
+    <li>🔒 <strong>No storage:</strong> All audio files are deleted immediately after processing.</li>
+    <li>📍 <strong>Hosting:</strong> Data is processed exclusively in our London (UK) hosting environment.</li>
+    <li>⚖️ <strong>GDPR compliance:</strong> We follow principles of data minimization, purpose limitation, and storage limitation.</li>
+    <li>🙅 <strong>No profiling:</strong> We do not profile users or reuse data for any other purpose.</li>
+    <li>📝 <strong>User responsibility:</strong> Results are provided “as is” without warranty. You remain responsible for how results are used.</li>
+  </ul>
+  <p>By using this service, you consent to this temporary processing. If you do not agree, please do not use the service.</p>
 </body>
 </html>
     """

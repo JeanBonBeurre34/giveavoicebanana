@@ -16,7 +16,7 @@ from resemblyzer import VoiceEncoder, preprocess_wav
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # restrict later in production
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -132,13 +132,8 @@ def frontend():
       box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     }
 
-    .card h3 {
-      margin-top: 0;
-    }
-
-    input[type="file"] {
-      margin-bottom: 0.8rem;
-    }
+    .card h3 { margin-top: 0; }
+    input[type="file"] { margin-bottom: 0.8rem; }
 
     button {
       background: #4f46e5;
@@ -156,10 +151,34 @@ def frontend():
     button:hover { background: #4338ca; }
 
     audio { margin-top: 0.8rem; display: block; }
-
     .status { margin-left: 0.5rem; font-style: italic; color: #555; }
-    #result { margin-top: 1.5rem; font-weight: bold; font-size: 1.2rem; text-align: center; }
-    .loader { color: #444; font-style: italic; }
+
+    /* Overlay modal */
+    #overlay {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.7);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+    #overlay-content {
+      background: white;
+      padding: 2rem;
+      border-radius: 12px;
+      text-align: center;
+      max-width: 400px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    #overlay h2 { margin-top: 0; }
+    #overlay button {
+      margin-top: 1rem;
+      background: #3b82f6;
+    }
+
+    /* Result colors */
     .great { color: green; }
     .match { color: orange; }
     .nomatch { color: red; }
@@ -185,7 +204,7 @@ def frontend():
         <li>📂 <strong>Provide two samples:</strong> either upload an audio file or record your voice directly with the microphone.</li>
         <li>🎤 <strong>Record if needed:</strong> use the Start/Stop buttons to capture live audio.</li>
         <li>📊 <strong>Compare:</strong> click the “Compare Voices” button.</li>
-        <li>✅❌ <strong>View results:</strong> you’ll see the raw similarity score and a verdict (Great match, Voice match, or No match).</li>
+        <li>✅❌ <strong>View results:</strong> similarity score + verdict displayed in an overlay.</li>
       </ol>
       <p><strong>Supported file types:</strong> WAV, MP3, OGG, WEBM, and most browser-recorded formats.</p>
     </section>
@@ -215,8 +234,16 @@ def frontend():
     <div style="text-align:center;">
       <button onclick="submitForm()">🔍 Compare Voices</button>
     </div>
-    <div id="result"></div>
   </main>
+
+  <!-- Overlay modal -->
+  <div id="overlay">
+    <div id="overlay-content">
+      <h2 id="overlay-title">⏳ Comparing…</h2>
+      <p id="overlay-text">Please wait while we analyze the voices.</p>
+      <button id="overlay-close" style="display:none;" onclick="closeOverlay()">Close</button>
+    </div>
+  </div>
 
 <script>
 const recorders = {};
@@ -278,6 +305,24 @@ function interpretScore(score) {
   return {text: "❌ No match", cls: "nomatch"};
 }
 
+function openOverlay(message="⏳ Comparing…", sub="Please wait while we analyze the voices.") {
+  document.getElementById("overlay-title").innerText = message;
+  document.getElementById("overlay-text").innerText = sub;
+  document.getElementById("overlay-close").style.display = "none";
+  document.getElementById("overlay").style.display = "flex";
+}
+
+function updateOverlayResult(score, verdict, cls) {
+  document.getElementById("overlay-title").innerText = verdict;
+  document.getElementById("overlay-title").className = cls;
+  document.getElementById("overlay-text").innerText = "Raw similarity score: " + score.toFixed(5);
+  document.getElementById("overlay-close").style.display = "inline-block";
+}
+
+function closeOverlay() {
+  document.getElementById("overlay").style.display = "none";
+}
+
 async function submitForm() {
   let f1 = document.getElementById("file1").files[0] || recorders["rec1"]?.file;
   let f2 = document.getElementById("file2").files[0] || recorders["rec2"]?.file;
@@ -286,9 +331,7 @@ async function submitForm() {
     return;
   }
 
-  const resultEl = document.getElementById("result");
-  resultEl.className = "loader";
-  resultEl.innerText = "⏳ Comparing… please wait";
+  openOverlay();
 
   let fd = new FormData();
   fd.append("file1", f1);
@@ -300,19 +343,13 @@ async function submitForm() {
     const data = await resp.json();
     const score = Number(data.similarity);
     const interp = interpretScore(score);
-    resultEl.className = interp.cls;
-    resultEl.innerText =
-      "Raw similarity score: " + score.toFixed(5) + " → " + interp.text;
+    updateOverlayResult(score, interp.text, interp.cls);
   } catch (err) {
-    resultEl.className = "nomatch";
-    resultEl.innerText = "Error: " + err.message;
+    updateOverlayResult(0, "❌ Error", "nomatch");
+    document.getElementById("overlay-text").innerText = err.message;
   }
 }
 </script>
 </body>
 </html>
     """
-
-
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8080)

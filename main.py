@@ -157,6 +157,8 @@ def frontend():
     body { font-family: 'Segoe UI', Tahoma, sans-serif; margin:0; padding:0; background:#f9fafb; }
     header { background: linear-gradient(90deg,#4f46e5,#3b82f6); color:white; text-align:center; padding:2rem 1rem; }
     main { max-width:900px; margin:1.5rem auto; padding:0 1rem; }
+    section { margin-bottom:2rem; }
+    .info { background:#eef2ff; border-left:4px solid #4f46e5; padding:1rem; border-radius:8px; }
     .card { background:white; border-radius:12px; padding:1.5rem; margin-bottom:1.5rem; box-shadow:0 2px 8px rgba(0,0,0,0.05); }
     button { background:#4f46e5; border:none; color:white; padding:0.6rem 1.2rem; border-radius:8px; cursor:pointer; margin:0.3rem; }
     button:hover { background:#4338ca; }
@@ -174,6 +176,17 @@ def frontend():
   </header>
 
   <main>
+    <section class="info">
+      <h2>ℹ️ How it works</h2>
+      <ol>
+        <li>📂 Upload or record two voice samples.</li>
+        <li>🎤 Use Start/Stop to record. Max 30s per recording.</li>
+        <li>🔍 Click “Compare Voices”.</li>
+        <li>✅ Results appear in overlay with similarity + suspicion analysis.</li>
+      </ol>
+      <p><strong>Supported formats:</strong> WAV, MP3, OGG, WEBM</p>
+    </section>
+
     <div class="card">
       <h3>Sample 1</h3>
       <input type="file" id="file1" accept="audio/*"><br>
@@ -241,14 +254,14 @@ function startRecording(id) {
     rec.start();
     recorders[id] = {recorder: rec};
 
-    // Timer with auto-stop
     let seconds = 0;
     document.getElementById(id + "-status").innerText = "Recording: 0s";
     timers[id] = setInterval(() => {
       seconds++;
-      document.getElementById(id + "-status").innerText = "Recording: " + seconds + "s";
       if (seconds >= MAX_DURATION) {
         stopRecording(id);
+      } else {
+        document.getElementById(id + "-status").innerText = "Recording: " + seconds + "s";
       }
     }, 1000);
 
@@ -311,10 +324,26 @@ def privacy():
     return """
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><title>Privacy | Do You Trust My Voice</title></head>
-<body style="font-family:Arial,sans-serif; margin:2rem;">
-  <h1>Privacy & Legal Disclaimer</h1>
-  <p>Audio is processed only for similarity and analysis. Files are deleted immediately. Data is processed in London (UK). GDPR compliant.</p>
+<head>
+  <meta charset="utf-8">
+  <title>Privacy | Do You Trust My Voice</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, sans-serif; margin:0; padding:0; background:#f9fafb; color:#111; }
+    header { background: linear-gradient(90deg,#4f46e5,#3b82f6); color:white; padding:1.5rem; text-align:center; }
+    main { max-width:800px; margin:2rem auto; background:white; padding:2rem; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.05); }
+    h1 { color:#1e3a8a; }
+    p { line-height:1.6; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Privacy & Legal Disclaimer</h1>
+  </header>
+  <main>
+    <p>We process audio only to compare similarity and analyze speech. Files are <strong>deleted immediately</strong> after processing. Data is processed in <strong>London (UK)</strong> and complies with <strong>GDPR</strong>.</p>
+    <p>By using this service, you consent to this temporary processing. Results are provided "as is" without warranty. You are responsible for how they are used.</p>
+  </main>
 </body>
 </html>
     """

@@ -62,16 +62,12 @@ def compare_wavs(w1: str, w2: str) -> float:
 def analyze_audio(file_path: str):
     y, sr = librosa.load(file_path, sr=16000)
 
-    # --- Duration ---
     duration = librosa.get_duration(y=y, sr=sr)
-
-    # --- Pauses ---
     intervals = librosa.effects.split(y, top_db=30)
     speech_durations = [(e - s) / sr for s, e in intervals]
     total_speech = sum(speech_durations)
     pause_ratio = (duration - total_speech) / duration if duration > 0 else 0
 
-    # --- Pitch ---
     try:
         f0 = librosa.yin(y, fmin=50, fmax=300)
         mean_pitch = float(np.nanmean(f0))
@@ -79,7 +75,6 @@ def analyze_audio(file_path: str):
     except Exception:
         mean_pitch, pitch_var = 0.0, 0.0
 
-    # --- Energy ---
     rms = librosa.feature.rms(y=y)[0]
     mean_energy = float(np.mean(rms))
     energy_var = float(np.var(rms))
@@ -99,13 +94,10 @@ def analyze_audio(file_path: str):
 
 def rate_suspicion(metrics):
     flags = []
-
     if metrics["speech_ratio"] < 0.4 or metrics["speech_ratio"] > 0.95:
         flags.append("Unnatural speech/pause ratio")
-
     if metrics["pitch_variation"] < 10:
         flags.append("Monotone pitch (possible synthetic)")
-
     if metrics["energy_variation"] < 1e-5:
         flags.append("Flat energy (possible normalization)")
 
@@ -165,12 +157,9 @@ def frontend():
     body { font-family: 'Segoe UI', Tahoma, sans-serif; margin:0; padding:0; background:#f9fafb; }
     header { background: linear-gradient(90deg,#4f46e5,#3b82f6); color:white; text-align:center; padding:2rem 1rem; }
     main { max-width:900px; margin:1.5rem auto; padding:0 1rem; }
-    section { margin-bottom:2rem; }
-    .info { background:#eef2ff; border-left:4px solid #4f46e5; padding:1rem; border-radius:8px; }
     .card { background:white; border-radius:12px; padding:1.5rem; margin-bottom:1.5rem; box-shadow:0 2px 8px rgba(0,0,0,0.05); }
-    button { background:#4f46e5; border:none; color:white; padding:0.6rem 1.2rem; border-radius:8px; cursor:pointer; margin:0.3rem; display:inline-flex; align-items:center; gap:0.3rem; }
+    button { background:#4f46e5; border:none; color:white; padding:0.6rem 1.2rem; border-radius:8px; cursor:pointer; margin:0.3rem; }
     button:hover { background:#4338ca; }
-    audio { margin-top:0.8rem; display:block; }
     .status { margin-left:0.5rem; font-style:italic; color:#555; }
     #overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); display:none; justify-content:center; align-items:center; z-index:1000; }
     #overlay-content { background:white; padding:2rem; border-radius:12px; text-align:center; max-width:500px; }
@@ -185,22 +174,12 @@ def frontend():
   </header>
 
   <main>
-    <section class="info">
-      <h2>ℹ️ How it works</h2>
-      <ol>
-        <li>📂 Upload or record two voice samples.</li>
-        <li>🎤 Use Start/Stop to record.</li>
-        <li>🔍 Click “Compare Voices”.</li>
-        <li>✅ Results will appear in overlay.</li>
-      </ol>
-      <p><strong>Supported:</strong> WAV, MP3, OGG, WEBM</p>
-    </section>
-
     <div class="card">
       <h3>Sample 1</h3>
       <input type="file" id="file1" accept="audio/*"><br>
       <button onclick="startRecording('rec1')">🎤 Start Recording</button>
       <button onclick="stopRecording('rec1')">⏹ Stop Recording</button>
+      <span id="rec1-status" class="status"></span>
       <div id="rec1-preview"></div>
     </div>
 
@@ -209,6 +188,7 @@ def frontend():
       <input type="file" id="file2" accept="audio/*"><br>
       <button onclick="startRecording('rec2')">🎤 Start Recording</button>
       <button onclick="stopRecording('rec2')">⏹ Stop Recording</button>
+      <span id="rec2-status" class="status"></span>
       <div id="rec2-preview"></div>
     </div>
 
@@ -231,11 +211,8 @@ def frontend():
 
 <script>
 const recorders = {};
-const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-if (isIOS && !isSafari) {
-  alert("⚠️ On iPhone/iPad, please open in Safari. In-app browsers may block mic.");
-}
+const timers = {};
+const MAX_DURATION = 30; // seconds
 
 function pickMime() {
   if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) return {mime:"audio/webm;codecs=opus", ext:".webm"};
@@ -258,15 +235,25 @@ function startRecording(id) {
       document.getElementById(id + "-preview").innerHTML = "";
       document.getElementById(id + "-preview").appendChild(audio);
       stream.getTracks().forEach(t => t.stop());
+      clearInterval(timers[id]);
+      document.getElementById(id + "-status").innerText = "";
     };
     rec.start();
     recorders[id] = {recorder: rec};
+
+    // Timer with auto-stop
+    let seconds = 0;
+    document.getElementById(id + "-status").innerText = "Recording: 0s";
+    timers[id] = setInterval(() => {
+      seconds++;
+      document.getElementById(id + "-status").innerText = "Recording: " + seconds + "s";
+      if (seconds >= MAX_DURATION) {
+        stopRecording(id);
+      }
+    }, 1000);
+
   }).catch(err => {
-    if (err.name === "NotAllowedError") {
-      alert("❌ Mic denied. Enable it in Safari: Settings > Safari > Privacy > Microphone.");
-    } else {
-      alert("Mic error: " + err.message);
-    }
+    alert("Mic error: " + err.message);
   });
 }
 

@@ -16,7 +16,7 @@ from resemblyzer import VoiceEncoder, preprocess_wav
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # restrict later in production
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -353,3 +353,7 @@ async function submitForm() {
 </body>
 </html>
     """
+
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8080)

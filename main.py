@@ -95,34 +95,6 @@ def frontend():
   <meta name="keywords" content="voice comparison, deepfake prevention, verify voice, voice authentication, AI voice check, trust voice, GDPR voice tool">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <!-- Open Graph / Facebook -->
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="https://doyoutrustmyvoice.com/">
-  <meta property="og:title" content="Do You Trust My Voice? | Voice Comparison & Deepfake Prevention">
-  <meta property="og:description" content="Verify voices and prevent deepfakes with our AI-powered voice comparison tool. Upload or record two voices and check if they match. GDPR compliant.">
-  <meta property="og:image" content="https://doyoutrustmyvoice.com/og-image.png">
-
-  <!-- Twitter -->
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:url" content="https://doyoutrustmyvoice.com/">
-  <meta name="twitter:title" content="Do You Trust My Voice? | Voice Comparison & Deepfake Prevention">
-  <meta name="twitter:description" content="Verify voices and prevent deepfakes with our AI-powered voice comparison tool. Upload or record two voices and check if they match. GDPR compliant.">
-  <meta name="twitter:image" content="https://doyoutrustmyvoice.com/og-image.png">
-
-  <!-- Structured Data for Google -->
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "WebApplication",
-    "name": "Do You Trust My Voice",
-    "url": "https://doyoutrustmyvoice.com",
-    "description": "Verify voices and prevent deepfakes with our AI-powered voice comparison tool.",
-    "applicationCategory": "Utility",
-    "operatingSystem": "Any",
-    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
-  }
-  </script>
-
   <style>
     body { font-family: 'Segoe UI', Tahoma, sans-serif; margin:0; padding:0; background:#f9fafb; }
     header { background: linear-gradient(90deg,#4f46e5,#3b82f6); color:white; text-align:center; padding:2rem 1rem; }
@@ -181,14 +153,6 @@ def frontend():
     <div style="text-align:center;">
       <button onclick="submitForm()">🔍 Compare Voices</button>
     </div>
-
-    <section class="info faq">
-      <h2>❓ FAQ</h2>
-      <p><strong>Is my voice data stored?</strong> No, it’s deleted after processing.</p>
-      <p><strong>Where is data processed?</strong> Securely in London (UK).</p>
-      <p><strong>Is this GDPR compliant?</strong> Yes, with minimization and no profiling.</p>
-      <p><strong>What file types are supported?</strong> WAV, MP3, OGG, WEBM.</p>
-    </section>
   </main>
 
   <!-- Overlay modal -->
@@ -206,6 +170,14 @@ def frontend():
 
 <script>
 const recorders = {};
+
+// iOS detection
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
+if (isIOS && !isSafari) {
+  alert("⚠️ On iPhone/iPad, please open this site in Safari for microphone recording. In-app browsers may block access.");
+}
 
 function pickMime() {
   if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) return {mime:"audio/webm;codecs=opus", ext:".webm"};
@@ -234,7 +206,13 @@ function startRecording(id) {
     };
     rec.start();
     recorders[id] = {recorder: rec};
-  }).catch(err => alert("Mic error: " + err));
+  }).catch(err => {
+    if (err.name === "NotAllowedError") {
+      alert("❌ Microphone access denied. Please enable it in Safari:\nSettings > Safari > Privacy > Microphone.");
+    } else {
+      alert("Mic error: " + err.message);
+    }
+  });
 }
 
 function stopRecording(id) {

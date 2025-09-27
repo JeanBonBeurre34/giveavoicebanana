@@ -8,6 +8,7 @@ import numpy as np
 from fastapi import FastAPI, UploadFile, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 import uvicorn
 
 from resemblyzer import VoiceEncoder, preprocess_wav
@@ -16,10 +17,13 @@ from resemblyzer import VoiceEncoder, preprocess_wav
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # restrict later in production
+    allow_origins=["*"],  # 🔒 restrict in production
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount static folder for OG images, favicon, etc.
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 encoder = VoiceEncoder()
 
@@ -90,44 +94,62 @@ def frontend():
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Voice Compare</title>
+  <title>Do You Trust My Voice? | Voice Comparison & Deepfake Prevention</title>
+  <meta name="description" content="DoYouTrustMyVoice.com helps you verify voices and prevent deepfakes. Upload or record two voices and check if they match. GDPR compliant.">
+  <meta name="keywords" content="voice comparison, deepfake prevention, verify voice, voice authentication, AI voice check, trust voice, GDPR voice tool">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://doyoutrustmyvoice.com/">
+  <meta property="og:title" content="Do You Trust My Voice? | Voice Comparison & Deepfake Prevention">
+  <meta property="og:description" content="Verify voices and prevent deepfakes with our AI-powered voice comparison tool. Upload or record two voices and check if they match. GDPR compliant.">
+  <meta property="og:image" content="https://doyoutrustmyvoice.com/static/og-image.png">
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:url" content="https://doyoutrustmyvoice.com/">
+  <meta name="twitter:title" content="Do You Trust My Voice? | Voice Comparison & Deepfake Prevention">
+  <meta name="twitter:description" content="Verify voices and prevent deepfakes with our AI-powered voice comparison tool. Upload or record two voices and check if they match. GDPR compliant.">
+  <meta name="twitter:image" content="https://doyoutrustmyvoice.com/static/og-image.png">
+
+  <!-- Structured Data for Google -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "Do You Trust My Voice",
+    "url": "https://doyoutrustmyvoice.com",
+    "description": "Verify voices and prevent deepfakes with our AI-powered voice comparison tool.",
+    "applicationCategory": "Utility",
+    "operatingSystem": "Any",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+  }
+  </script>
+
   <style>
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: #f9fafb;
-      color: #333;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-      min-height: 100vh;
-    }
-    header {
-      background: linear-gradient(90deg, #4f46e5, #3b82f6);
-      color: white;
-      padding: 2rem 1rem;
-      text-align: center;
-    }
-    main { flex: 1; max-width: 800px; margin: 1.5rem auto; padding: 0 1rem; }
-    .info { background: #eef2ff; border-left: 4px solid #4f46e5; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; }
-    .card { background: white; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-    input[type="file"] { margin-bottom: 0.8rem; }
-    button { background: #4f46e5; border: none; color: white; padding: 0.6rem 1.2rem; border-radius: 8px; cursor: pointer; margin: 0.3rem; display: inline-flex; align-items: center; gap: 0.3rem; }
-    button:hover { background: #4338ca; }
-    audio { margin-top: 0.8rem; display: block; }
-    .status { margin-left: 0.5rem; font-style: italic; color: #555; }
-    #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 1000; }
-    #overlay-content { background: white; padding: 2rem; border-radius: 12px; text-align: center; max-width: 400px; }
-    footer { background: #f1f5f9; padding: 1rem; font-size: 0.8rem; text-align: center; color: #555; }
-    .great { color: green; } .match { color: orange; } .nomatch { color: red; }
-    @media (max-width: 600px) { button { width: 100%; margin-bottom: 0.6rem; justify-content: center; } }
+    body { font-family: 'Segoe UI', Tahoma, sans-serif; margin:0; padding:0; background:#f9fafb; }
+    header { background: linear-gradient(90deg,#4f46e5,#3b82f6); color:white; text-align:center; padding:2rem 1rem; }
+    main { max-width:900px; margin:1.5rem auto; padding:0 1rem; }
+    section { margin-bottom:2rem; }
+    .info { background:#eef2ff; border-left:4px solid #4f46e5; padding:1rem; border-radius:8px; }
+    .card { background:white; border-radius:12px; padding:1.5rem; margin-bottom:1.5rem; box-shadow:0 2px 8px rgba(0,0,0,0.05); }
+    input[type="file"] { margin-bottom:0.8rem; }
+    button { background:#4f46e5; border:none; color:white; padding:0.6rem 1.2rem; border-radius:8px; cursor:pointer; margin:0.3rem; display:inline-flex; align-items:center; gap:0.3rem; }
+    button:hover { background:#4338ca; }
+    audio { margin-top:0.8rem; display:block; }
+    .status { margin-left:0.5rem; font-style:italic; color:#555; }
+    #overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); display:none; justify-content:center; align-items:center; z-index:1000; }
+    #overlay-content { background:white; padding:2rem; border-radius:12px; text-align:center; max-width:400px; }
+    footer { background:#f1f5f9; padding:1rem; text-align:center; font-size:0.85rem; color:#555; }
+    .great { color:green; } .match { color:orange; } .nomatch { color:red; }
+    @media (max-width:600px) { button { width:100%; margin-bottom:0.6rem; justify-content:center; } }
   </style>
 </head>
 <body>
   <header>
-    <h1>🎙️ Voice Compare</h1>
-    <p>Check if two voices belong to the same speaker</p>
+    <h1>🎙️ Do You Trust My Voice?</h1>
+    <p>Verify voices. Prevent deepfakes. Build trust.</p>
   </header>
 
   <main>
@@ -163,6 +185,14 @@ def frontend():
     <div style="text-align:center;">
       <button onclick="submitForm()">🔍 Compare Voices</button>
     </div>
+
+    <section class="info faq">
+      <h2>❓ FAQ</h2>
+      <p><strong>Is my voice data stored?</strong> No, it’s deleted after processing.</p>
+      <p><strong>Where is data processed?</strong> Securely in London (UK).</p>
+      <p><strong>Is this GDPR compliant?</strong> Yes, with minimization and no profiling.</p>
+      <p><strong>What file types are supported?</strong> WAV, MP3, OGG, WEBM.</p>
+    </section>
   </main>
 
   <!-- Overlay modal -->
@@ -175,7 +205,7 @@ def frontend():
   </div>
 
   <footer>
-    <p>⚖️ <a href="/privacy" target="_blank">Privacy & Legal Disclaimer</a></p>
+    <p>© 2025 DoYouTrustMyVoice.com — <a href="/privacy">Privacy Policy</a></p>
   </footer>
 
 <script>
@@ -192,17 +222,8 @@ function startRecording(id) {
     const {mime, ext} = pickMime();
     const rec = new MediaRecorder(stream, mime ? {mimeType: mime} : {});
     let chunks = [];
-    let startTime = Date.now();
-    let timer = setInterval(() => {
-      let elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-      document.getElementById(id + "-status").innerText = "Recording… " + elapsed + "s";
-    }, 100);
-
     rec.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
     rec.onstop = () => {
-      clearInterval(timer);
-      document.getElementById(id + "-status").innerText = "Recorded";
-
       const blob = new Blob(chunks, { type: mime || chunks[0].type });
       const file = new File([blob], id + ext, { type: blob.type });
       recorders[id] = { file };
@@ -210,9 +231,8 @@ function startRecording(id) {
       const audio = document.createElement("audio");
       audio.controls = true;
       audio.src = URL.createObjectURL(blob);
-      const preview = document.getElementById(id + "-preview");
-      preview.innerHTML = "";
-      preview.appendChild(audio);
+      document.getElementById(id + "-preview").innerHTML = "";
+      document.getElementById(id + "-preview").appendChild(audio);
 
       stream.getTracks().forEach(t => t.stop());
     };
@@ -286,14 +306,10 @@ def privacy():
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Privacy & Legal Disclaimer</title>
+  <title>Privacy & Legal Disclaimer | Do You Trust My Voice</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>
-    body { font-family: Arial, sans-serif; margin: 2rem; line-height: 1.6; }
-    h1 { color: #4f46e5; }
-  </style>
 </head>
-<body>
+<body style="font-family:Arial,sans-serif; margin:2rem; line-height:1.6;">
   <h1>Privacy & Legal Disclaimer</h1>
   <p>This service processes audio data strictly for the purpose of voice similarity comparison.</p>
   <ul>
@@ -307,6 +323,33 @@ def privacy():
 </body>
 </html>
     """
+
+
+@app.get("/sitemap.xml", response_class=HTMLResponse)
+def sitemap():
+    return """<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://doyoutrustmyvoice.com/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://doyoutrustmyvoice.com/privacy</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.5</priority>
+  </url>
+</urlset>
+"""
+
+
+@app.get("/robots.txt", response_class=HTMLResponse)
+def robots():
+    return """User-agent: *
+Allow: /
+
+Sitemap: https://doyoutrustmyvoice.com/sitemap.xml
+"""
 
 
 if __name__ == "__main__":

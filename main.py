@@ -101,7 +101,8 @@ def frontend():
     body { font-family: Arial, sans-serif; margin: 2rem; }
     .card { border: 1px solid #ddd; padding: 1rem; margin-bottom: 1rem; border-radius: 8px; }
     button { margin-right: 0.5rem; padding: 0.5rem 1rem; }
-    audio { margin-top: 0.5rem; }
+    audio { margin-top: 0.5rem; display: block; }
+    .status { margin-left: 0.5rem; font-style: italic; color: #555; }
     #result { margin-top: 1rem; font-weight: bold; color: blue; }
   </style>
 </head>
@@ -114,6 +115,7 @@ def frontend():
     <input type="file" id="file1" accept="audio/*"><br>
     <button onclick="startRecording('rec1')">Start Recording</button>
     <button onclick="stopRecording('rec1')">Stop Recording</button>
+    <span id="rec1-status" class="status"></span>
     <div id="rec1-preview"></div>
   </div>
 
@@ -122,6 +124,7 @@ def frontend():
     <input type="file" id="file2" accept="audio/*"><br>
     <button onclick="startRecording('rec2')">Start Recording</button>
     <button onclick="stopRecording('rec2')">Stop Recording</button>
+    <span id="rec2-status" class="status"></span>
     <div id="rec2-preview"></div>
   </div>
 
@@ -129,7 +132,7 @@ def frontend():
   <div id="result"></div>
 
 <script>
-const recorders = {}; // holds recorder + file per id
+const recorders = {}; // holds recorder, file, timer
 
 function pickMime() {
   if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) return {mime:"audio/webm;codecs=opus", ext:".webm"};
@@ -142,8 +145,17 @@ function startRecording(id) {
     const {mime, ext} = pickMime();
     const rec = new MediaRecorder(stream, mime ? {mimeType: mime} : {});
     let chunks = [];
+    let startTime = Date.now();
+    let timer = setInterval(() => {
+      let elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      document.getElementById(id + "-status").innerText = "Recording… " + elapsed + "s";
+    }, 100);
+
     rec.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
     rec.onstop = () => {
+      clearInterval(timer);
+      document.getElementById(id + "-status").innerText = "Recorded";
+
       const blob = new Blob(chunks, { type: mime || chunks[0].type });
       const file = new File([blob], id + ext, { type: blob.type });
       recorders[id] = { file };

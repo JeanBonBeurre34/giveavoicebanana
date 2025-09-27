@@ -16,7 +16,7 @@ from resemblyzer import VoiceEncoder, preprocess_wav
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # restrict later in production
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -91,6 +91,7 @@ def frontend():
 <head>
   <meta charset="utf-8">
   <title>Voice Compare</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -102,7 +103,7 @@ def frontend():
     header {
       background: linear-gradient(90deg, #4f46e5, #3b82f6);
       color: white;
-      padding: 2rem;
+      padding: 2rem 1rem;
       text-align: center;
     }
     header h1 { margin: 0; font-size: 2rem; }
@@ -110,9 +111,18 @@ def frontend():
 
     main {
       max-width: 800px;
-      margin: 2rem auto;
-      padding: 1rem;
+      margin: 1.5rem auto;
+      padding: 0 1rem;
     }
+
+    .info {
+      background: #eef2ff;
+      border-left: 4px solid #4f46e5;
+      padding: 1rem;
+      border-radius: 8px;
+      margin-bottom: 2rem;
+    }
+    .info h2 { margin-top: 0; }
 
     .card {
       background: white;
@@ -126,6 +136,10 @@ def frontend():
       margin-top: 0;
     }
 
+    input[type="file"] {
+      margin-bottom: 0.8rem;
+    }
+
     button {
       background: #4f46e5;
       border: none;
@@ -134,27 +148,28 @@ def frontend():
       border-radius: 8px;
       cursor: pointer;
       transition: background 0.2s;
-      margin-right: 0.5rem;
+      margin: 0.3rem 0.3rem 0.3rem 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
     }
     button:hover { background: #4338ca; }
 
-    audio { margin-top: 0.5rem; display: block; }
+    audio { margin-top: 0.8rem; display: block; }
 
     .status { margin-left: 0.5rem; font-style: italic; color: #555; }
-    #result { margin-top: 1.5rem; font-weight: bold; font-size: 1.2rem; }
+    #result { margin-top: 1.5rem; font-weight: bold; font-size: 1.2rem; text-align: center; }
     .loader { color: #444; font-style: italic; }
     .great { color: green; }
     .match { color: orange; }
     .nomatch { color: red; }
 
-    .info {
-      background: #eef2ff;
-      border-left: 4px solid #4f46e5;
-      padding: 1rem;
-      border-radius: 8px;
-      margin-bottom: 2rem;
+    /* Responsive design */
+    @media (max-width: 600px) {
+      header h1 { font-size: 1.5rem; }
+      .card { padding: 1rem; }
+      button { width: 100%; margin-bottom: 0.6rem; justify-content: center; }
     }
-    .info h2 { margin-top: 0; }
   </style>
 </head>
 <body>
@@ -165,31 +180,35 @@ def frontend():
 
   <main>
     <section class="info">
-      <h2>About this project</h2>
-      <p>
-        This project helps detect whether two voice samples belong to the same speaker. 
-        It’s designed to fight voice impersonation and deepfakes. 
-        Users can <strong>upload files</strong> or <strong>record directly in the browser</strong>. 
-        Files are processed in memory, compared, and deleted after use — nothing is stored permanently.
-      </p>
-      <p><strong>Supported file types:</strong> .wav, .mp3, .ogg, .webm (others may also work, since we convert everything with ffmpeg).</p>
+      <h2>ℹ️ How it works</h2>
+      <ol>
+        <li>📂 <strong>Provide two samples:</strong> either upload an audio file or record your voice directly with the microphone.</li>
+        <li>🎤 <strong>Record if needed:</strong> use the Start/Stop buttons to capture live audio.</li>
+        <li>📊 <strong>Compare:</strong> click the “Compare Voices” button.</li>
+        <li>✅❌ <strong>View results:</strong> you’ll see the raw similarity score and a verdict (Great match, Voice match, or No match).</li>
+      </ol>
+      <p><strong>Supported file types:</strong> WAV, MP3, OGG, WEBM, and most browser-recorded formats.</p>
     </section>
 
     <div class="card">
       <h3>Sample 1</h3>
       <input type="file" id="file1" accept="audio/*"><br>
-      <button onclick="startRecording('rec1')">Start Recording</button>
-      <button onclick="stopRecording('rec1')">Stop Recording</button>
-      <span id="rec1-status" class="status"></span>
+      <div style="margin-top: 0.5rem;">
+        <button onclick="startRecording('rec1')">🎤 Start Recording</button>
+        <button onclick="stopRecording('rec1')">⏹ Stop Recording</button>
+        <span id="rec1-status" class="status"></span>
+      </div>
       <div id="rec1-preview"></div>
     </div>
 
     <div class="card">
       <h3>Sample 2</h3>
       <input type="file" id="file2" accept="audio/*"><br>
-      <button onclick="startRecording('rec2')">Start Recording</button>
-      <button onclick="stopRecording('rec2')">Stop Recording</button>
-      <span id="rec2-status" class="status"></span>
+      <div style="margin-top: 0.5rem;">
+        <button onclick="startRecording('rec2')">🎤 Start Recording</button>
+        <button onclick="stopRecording('rec2')">⏹ Stop Recording</button>
+        <span id="rec2-status" class="status"></span>
+      </div>
       <div id="rec2-preview"></div>
     </div>
 
@@ -293,6 +312,7 @@ async function submitForm() {
 </body>
 </html>
     """
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8080)

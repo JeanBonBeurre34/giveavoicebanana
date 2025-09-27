@@ -25,7 +25,6 @@ encoder = VoiceEncoder()
 
 # ----------------- Helpers -----------------
 def save_upload(upload: UploadFile) -> str:
-    """Save an uploaded file to temp and return path."""
     suffix = Path(upload.filename).suffix or ".bin"
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
     try:
@@ -40,15 +39,10 @@ def save_upload(upload: UploadFile) -> str:
 
 
 def convert_to_wav(path: str) -> str:
-    """Convert input file to 16kHz mono WAV using ffmpeg."""
     out = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
     out.close()
-    cmd = [
-        "ffmpeg", "-hide_banner", "-loglevel", "error",
-        "-y", "-i", path,
-        "-ac", "1", "-ar", "16000",
-        out.name
-    ]
+    cmd = ["ffmpeg", "-hide_banner", "-loglevel", "error",
+           "-y", "-i", path, "-ac", "1", "-ar", "16000", out.name]
     try:
         subprocess.run(cmd, check=True)
     except subprocess.CalledProcessError as e:
@@ -103,7 +97,7 @@ def frontend():
     button { margin-right: 0.5rem; padding: 0.5rem 1rem; }
     audio { margin-top: 0.5rem; display: block; }
     .status { margin-left: 0.5rem; font-style: italic; color: #555; }
-    #result { margin-top: 1rem; font-weight: bold; color: blue; }
+    #result { margin-top: 1rem; font-weight: bold; }
   </style>
 </head>
 <body>
@@ -132,7 +126,7 @@ def frontend():
   <div id="result"></div>
 
 <script>
-const recorders = {}; // holds recorder, file, timer
+const recorders = {};
 
 function pickMime() {
   if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) return {mime:"audio/webm;codecs=opus", ext:".webm"};
@@ -185,6 +179,12 @@ function stopRecording(id) {
   }
 }
 
+function interpretScore(score) {
+  if (score > 0.9) return "✅ Great match";
+  if (score > 0.7) return "⚠️ Voice match";
+  return "❌ No match";
+}
+
 async function submitForm() {
   let f1 = document.getElementById("file1").files[0] || recorders["rec1"]?.file;
   let f2 = document.getElementById("file2").files[0] || recorders["rec2"]?.file;
@@ -197,7 +197,9 @@ async function submitForm() {
   fd.append("file2", f2);
   const resp = await fetch("/compare", { method: "POST", body: fd });
   const data = await resp.json();
-  document.getElementById("result").innerText = "Raw similarity score: " + data.similarity.toFixed(5);
+  const score = Number(data.similarity);
+  document.getElementById("result").innerText =
+    "Raw similarity score: " + score.toFixed(5) + " → " + interpretScore(score);
 }
 </script>
 </body>

@@ -98,6 +98,10 @@ def frontend():
     audio { margin-top: 0.5rem; display: block; }
     .status { margin-left: 0.5rem; font-style: italic; color: #555; }
     #result { margin-top: 1rem; font-weight: bold; }
+    .loader { color: #444; font-style: italic; }
+    .great { color: green; }
+    .match { color: orange; }
+    .nomatch { color: red; }
   </style>
 </head>
 <body>
@@ -180,9 +184,9 @@ function stopRecording(id) {
 }
 
 function interpretScore(score) {
-  if (score > 0.9) return "✅ Great match";
-  if (score > 0.7) return "⚠️ Voice match";
-  return "❌ No match";
+  if (score > 0.9) return {text: "✅ Great match", cls: "great"};
+  if (score > 0.7) return {text: "⚠️ Voice match", cls: "match"};
+  return {text: "❌ No match", cls: "nomatch"};
 }
 
 async function submitForm() {
@@ -192,14 +196,28 @@ async function submitForm() {
     alert("Please provide both samples.");
     return;
   }
+
+  const resultEl = document.getElementById("result");
+  resultEl.className = "loader";
+  resultEl.innerText = "⏳ Comparing… please wait";
+
   let fd = new FormData();
   fd.append("file1", f1);
   fd.append("file2", f2);
-  const resp = await fetch("/compare", { method: "POST", body: fd });
-  const data = await resp.json();
-  const score = Number(data.similarity);
-  document.getElementById("result").innerText =
-    "Raw similarity score: " + score.toFixed(5) + " → " + interpretScore(score);
+
+  try {
+    const resp = await fetch("/compare", { method: "POST", body: fd });
+    if (!resp.ok) throw new Error("Server error " + resp.status);
+    const data = await resp.json();
+    const score = Number(data.similarity);
+    const interp = interpretScore(score);
+    resultEl.className = interp.cls;
+    resultEl.innerText =
+      "Raw similarity score: " + score.toFixed(5) + " → " + interp.text;
+  } catch (err) {
+    resultEl.className = "nomatch";
+    resultEl.innerText = "Error: " + err.message;
+  }
 }
 </script>
 </body>

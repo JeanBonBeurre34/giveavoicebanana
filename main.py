@@ -160,6 +160,7 @@ def frontend():
     section { margin-bottom:2rem; }
     .info { background:#eef2ff; border-left:4px solid #4f46e5; padding:1rem; border-radius:8px; }
     .card { background:white; border-radius:12px; padding:1.5rem; margin-bottom:1.5rem; box-shadow:0 2px 8px rgba(0,0,0,0.05); }
+    input[type="file"] { margin-bottom:1rem; display:block; }
     button { background:#4f46e5; border:none; color:white; padding:0.6rem 1.2rem; border-radius:8px; cursor:pointer; margin:0.3rem; }
     button:hover { background:#4338ca; }
     .status { margin-left:0.5rem; font-style:italic; color:#555; }
@@ -167,6 +168,9 @@ def frontend():
     #overlay-content { background:white; padding:2rem; border-radius:12px; text-align:center; max-width:500px; }
     footer { background:#f1f5f9; padding:1rem; text-align:center; font-size:0.85rem; color:#555; }
     .great { color:green; } .match { color:orange; } .nomatch { color:red; }
+    .faq { background:white; border-radius:12px; padding:1.5rem; margin:2rem 0; box-shadow:0 2px 8px rgba(0,0,0,0.05); }
+    .faq h2 { color:#1e3a8a; margin-bottom:1rem; }
+    .faq p { margin:0.5rem 0 1rem; }
   </style>
 </head>
 <body>
@@ -189,7 +193,7 @@ def frontend():
 
     <div class="card">
       <h3>Sample 1</h3>
-      <input type="file" id="file1" accept="audio/*"><br>
+      <input type="file" id="file1" accept="audio/*">
       <button onclick="startRecording('rec1')">🎤 Start Recording</button>
       <button onclick="stopRecording('rec1')">⏹ Stop Recording</button>
       <span id="rec1-status" class="status"></span>
@@ -198,7 +202,7 @@ def frontend():
 
     <div class="card">
       <h3>Sample 2</h3>
-      <input type="file" id="file2" accept="audio/*"><br>
+      <input type="file" id="file2" accept="audio/*">
       <button onclick="startRecording('rec2')">🎤 Start Recording</button>
       <button onclick="stopRecording('rec2')">⏹ Stop Recording</button>
       <span id="rec2-status" class="status"></span>
@@ -208,6 +212,14 @@ def frontend():
     <div style="text-align:center;">
       <button onclick="submitForm()">🔍 Compare Voices</button>
     </div>
+
+    <section class="faq">
+      <h2>❓ FAQ</h2>
+      <p><strong>Is my voice stored?</strong><br>No. All audio is deleted immediately after analysis.</p>
+      <p><strong>Where is the processing done?</strong><br>In London (UK), fully GDPR compliant.</p>
+      <p><strong>How accurate is this tool?</strong><br>We provide a similarity score and speech analysis. Use results as guidance, not proof.</p>
+      <p><strong>Which formats are supported?</strong><br>WAV, MP3, OGG, WEBM.</p>
+    </section>
   </main>
 
   <div id="overlay">

@@ -17,7 +17,7 @@ from resemblyzer import VoiceEncoder, preprocess_wav
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://doyoutrustmyvoice.com"],  # restrict to prod domain
+    allow_origins=["*"],  # restrict to prod domain
     allow_methods=["POST", "GET"],
     allow_headers=["Content-Type"],
 )

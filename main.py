@@ -17,35 +17,59 @@ from resemblyzer import VoiceEncoder, preprocess_wav
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 🔒 restrict in production
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=["https://doyoutrustmyvoice.com"],  # restrict to prod domain
+    allow_methods=["POST", "GET"],
+    allow_headers=["Content-Type"],
 )
 
 encoder = VoiceEncoder()
 
 # ----------------- Helpers -----------------
+MAX_UPLOAD_MB = 20
+MAX_UPLOAD_DURATION_SEC = 60
+SUBPROCESS_TIMEOUT = 120
+
 def save_upload(upload: UploadFile) -> str:
-    suffix = Path(upload.filename).suffix or ".bin"
+    """Save uploaded file with size check"""
+    suffix = Path(upload.filename or "").suffix or ".bin"
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
     try:
-        shutil.copyfileobj(upload.file, tmp)
+        size = 0
+        while True:
+            chunk = upload.file.read(1024 * 1024)
+            if not chunk:
+                break
+            size += len(chunk)
+            if size > MAX_UPLOAD_MB * 1024 * 1024:
+                tmp.close()
+                os.remove(tmp.name)
+                raise HTTPException(status_code=413, detail="File too large (>20MB)")
+            tmp.write(chunk)
         tmp.flush()
         tmp.close()
         return tmp.name
     except Exception:
         tmp.close()
         os.remove(tmp.name)
-        raise
+        raise HTTPException(status_code=400, detail="Failed to save upload")
 
 
 def convert_to_wav(path: str) -> str:
+    """Convert to 16kHz mono WAV"""
     out = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
     out.close()
-    cmd = ["ffmpeg", "-hide_banner", "-loglevel", "error",
-           "-y", "-i", path, "-ac", "1", "-ar", "16000", out.name]
+    cmd = [
+        "ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error",
+        "-y", "-safe", "1",
+        "-i", path,
+        "-t", str(MAX_UPLOAD_DURATION_SEC + 1),
+        "-ac", "1", "-ar", "16000",
+        out.name
+    ]
     try:
-        subprocess.run(cmd, check=True)
+        subprocess.run(cmd, check=True, timeout=SUBPROCESS_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=408, detail="Audio conversion timed out")
     except subprocess.CalledProcessError as e:
         raise HTTPException(status_code=400, detail=f"ffmpeg failed: {e}")
     return out.name
@@ -88,7 +112,6 @@ def analyze_audio(file_path: str):
         "mean_energy": mean_energy,
         "energy_variation": energy_var,
     }
-
     return {**metrics, **rate_suspicion(metrics)}
 
 
@@ -107,7 +130,6 @@ def rate_suspicion(metrics):
         suspicion = "Medium"
     else:
         suspicion = "High"
-
     return {"suspicion": suspicion, "flags": flags}
 
 
@@ -138,16 +160,14 @@ async def compare(file1: UploadFile, file2: UploadFile):
     finally:
         for f in [p1, p2, w1, w2]:
             if f and os.path.exists(f):
-                try:
-                    os.remove(f)
-                except Exception:
-                    pass
+                try: os.remove(f)
+                except Exception: pass
 
 
+# ----------------- Frontend -----------------
 @app.get("/", response_class=HTMLResponse)
 def frontend():
-    return """
-<!doctype html>
+    return """<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -157,20 +177,18 @@ def frontend():
     body { font-family: 'Segoe UI', Tahoma, sans-serif; margin:0; padding:0; background:#f9fafb; }
     header { background: linear-gradient(90deg,#4f46e5,#3b82f6); color:white; text-align:center; padding:2rem 1rem; }
     main { max-width:900px; margin:1.5rem auto; padding:0 1rem; }
-    section { margin-bottom:2rem; }
-    .info { background:#eef2ff; border-left:4px solid #4f46e5; padding:1rem; border-radius:8px; }
+    .info { background:#eef2ff; border-left:4px solid #4f46e5; padding:1rem; border-radius:8px; margin-bottom:2rem; }
     .card { background:white; border-radius:12px; padding:1.5rem; margin-bottom:1.5rem; box-shadow:0 2px 8px rgba(0,0,0,0.05); }
-    input[type="file"] { margin-bottom:1rem; display:block; }
+    input[type="file"] { margin-bottom:1rem; }
     button { background:#4f46e5; border:none; color:white; padding:0.6rem 1.2rem; border-radius:8px; cursor:pointer; margin:0.3rem; }
     button:hover { background:#4338ca; }
     .status { margin-left:0.5rem; font-style:italic; color:#555; }
     #overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); display:none; justify-content:center; align-items:center; z-index:1000; }
     #overlay-content { background:white; padding:2rem; border-radius:12px; text-align:center; max-width:500px; }
+    .spinner { border:4px solid #f3f3f3; border-top:4px solid #4f46e5; border-radius:50%; width:36px; height:36px; animation: spin 1s linear infinite; margin:auto; }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
     footer { background:#f1f5f9; padding:1rem; text-align:center; font-size:0.85rem; color:#555; }
-    .great { color:green; } .match { color:orange; } .nomatch { color:red; }
     .faq { background:white; border-radius:12px; padding:1.5rem; margin:2rem 0; box-shadow:0 2px 8px rgba(0,0,0,0.05); }
-    .faq h2 { color:#1e3a8a; margin-bottom:1rem; }
-    .faq p { margin:0.5rem 0 1rem; }
   </style>
 </head>
 <body>
@@ -184,7 +202,7 @@ def frontend():
       <h2>ℹ️ How it works</h2>
       <ol>
         <li>📂 Upload or record two voice samples.</li>
-        <li>🎤 Use Start/Stop to record. Max 30s per recording.</li>
+        <li>🎤 Use Start/Stop to record (max 30s).</li>
         <li>🔍 Click “Compare Voices”.</li>
         <li>✅ Results appear in overlay with similarity + suspicion analysis.</li>
       </ol>
@@ -215,150 +233,64 @@ def frontend():
 
     <section class="faq">
       <h2>❓ FAQ</h2>
-      <p><strong>Is my voice stored?</strong><br>No. All audio is deleted immediately after analysis.</p>
-      <p><strong>Where is the processing done?</strong><br>In London (UK), fully GDPR compliant.</p>
-      <p><strong>How accurate is this tool?</strong><br>We provide a similarity score and speech analysis. Use results as guidance, not proof.</p>
-      <p><strong>Which formats are supported?</strong><br>WAV, MP3, OGG, WEBM.</p>
+      <p><strong>Is my voice stored?</strong><br>No. Files are deleted immediately after analysis.</p>
+      <p><strong>Where is processing done?</strong><br>In London (UK), GDPR compliant.</p>
+      <p><strong>How accurate?</strong><br>We provide a similarity score + analysis as guidance, not proof.</p>
     </section>
   </main>
 
   <div id="overlay">
     <div id="overlay-content">
-      <h2 id="overlay-title">⏳ Comparing…</h2>
+      <div class="spinner" id="overlay-spinner"></div>
+      <h2 id="overlay-title">⏳ Processing…</h2>
       <pre id="overlay-text">Please wait...</pre>
       <button id="overlay-close" style="display:none;" onclick="closeOverlay()">Close</button>
     </div>
   </div>
 
-  <footer>
-    <p>© 2025 DoYouTrustMyVoice.com — <a href="/privacy">Privacy Policy</a></p>
-  </footer>
+  <footer><p>© 2025 DoYouTrustMyVoice.com — <a href="/privacy">Privacy Policy</a></p></footer>
 
 <script>
-const recorders = {};
-const timers = {};
-const MAX_DURATION = 30; // seconds
-
-function pickMime() {
-  if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) return {mime:"audio/webm;codecs=opus", ext:".webm"};
-  if (MediaRecorder.isTypeSupported("audio/ogg;codecs=opus")) return {mime:"audio/ogg;codecs=opus", ext:".ogg"};
-  return {mime:"", ext:".bin"};
-}
-
-function startRecording(id) {
-  navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-    const {mime, ext} = pickMime();
-    const rec = new MediaRecorder(stream, mime ? {mimeType: mime} : {});
-    let chunks = [];
-    rec.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
-    rec.onstop = () => {
-      const blob = new Blob(chunks, { type: mime || chunks[0].type });
-      recorders[id] = { file: new File([blob], id + ext, { type: blob.type }) };
-      const audio = document.createElement("audio");
-      audio.controls = true;
-      audio.src = URL.createObjectURL(blob);
-      document.getElementById(id + "-preview").innerHTML = "";
-      document.getElementById(id + "-preview").appendChild(audio);
-      stream.getTracks().forEach(t => t.stop());
-      clearInterval(timers[id]);
-      document.getElementById(id + "-status").innerText = "";
-    };
-    rec.start();
-    recorders[id] = {recorder: rec};
-
-    let seconds = 0;
-    document.getElementById(id + "-status").innerText = "Recording: 0s";
-    timers[id] = setInterval(() => {
-      seconds++;
-      if (seconds >= MAX_DURATION) {
-        stopRecording(id);
-      } else {
-        document.getElementById(id + "-status").innerText = "Recording: " + seconds + "s";
-      }
-    }, 1000);
-
-  }).catch(err => {
-    alert("Mic error: " + err.message);
-  });
-}
-
-function stopRecording(id) {
-  const r = recorders[id]?.recorder;
-  if (r) { r.requestData(); r.stop(); }
-}
-
-function openOverlay() {
-  document.getElementById("overlay-title").innerText = "⏳ Comparing…";
-  document.getElementById("overlay-text").innerText = "Please wait...";
-  document.getElementById("overlay-close").style.display = "none";
-  document.getElementById("overlay").style.display = "flex";
-}
-function updateOverlay(data) {
-  const verdict = data.similarity > 0.9 ? "✅ Great match"
-                : data.similarity > 0.7 ? "⚠️ Voice match"
-                : "❌ No match";
-  let txt = `Raw similarity: ${data.similarity.toFixed(5)}\\n\\n`;
-  txt += "Sample 1 suspicion: " + data.analysis_sample1.suspicion + "\\n";
-  txt += "Flags: " + data.analysis_sample1.flags.join(", ") + "\\n\\n";
-  txt += "Sample 2 suspicion: " + data.analysis_sample2.suspicion + "\\n";
-  txt += "Flags: " + data.analysis_sample2.flags.join(", ");
-  document.getElementById("overlay-title").innerText = verdict;
-  document.getElementById("overlay-text").innerText = txt;
-  document.getElementById("overlay-close").style.display = "inline-block";
-}
-function closeOverlay() { document.getElementById("overlay").style.display = "none"; }
-
-async function submitForm() {
-  let f1 = document.getElementById("file1").files[0] || recorders["rec1"]?.file;
-  let f2 = document.getElementById("file2").files[0] || recorders["rec2"]?.file;
-  if (!f1 || !f2) { alert("Please provide both samples."); return; }
-  openOverlay();
-  let fd = new FormData();
-  fd.append("file1", f1); fd.append("file2", f2);
-  try {
-    const resp = await fetch("/compare", { method: "POST", body: fd });
-    if (!resp.ok) throw new Error("Server error " + resp.status);
-    updateOverlay(await resp.json());
-  } catch (err) {
-    document.getElementById("overlay-title").innerText = "❌ Error";
-    document.getElementById("overlay-text").innerText = err.message;
-    document.getElementById("overlay-close").style.display = "inline-block";
-  }
-}
+const recorders = {}; const timers = {}; const MAX_DURATION = 30;
+function pickMime(){ if(MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) return {mime:"audio/webm;codecs=opus",ext:".webm"};
+if(MediaRecorder.isTypeSupported("audio/ogg;codecs=opus")) return {mime:"audio/ogg;codecs=opus",ext:".ogg"}; return {mime:"",ext:".bin"};}
+function startRecording(id){navigator.mediaDevices.getUserMedia({audio:true}).then(stream=>{
+ const {mime,ext}=pickMime();const rec=new MediaRecorder(stream,mime?{mimeType:mime}:{});
+ let chunks=[];rec.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data);};
+ rec.onstop=()=>{const blob=new Blob(chunks,{type:mime||chunks[0].type});recorders[id]={file:new File([blob],id+ext,{type:blob.type})};
+ const audio=document.createElement("audio");audio.controls=true;audio.src=URL.createObjectURL(blob);
+ document.getElementById(id+"-preview").innerHTML="";document.getElementById(id+"-preview").appendChild(audio);
+ stream.getTracks().forEach(t=>t.stop());clearInterval(timers[id]);document.getElementById(id+"-status").innerText="";};
+ rec.start();recorders[id]={recorder:rec};let sec=0;document.getElementById(id+"-status").innerText="Recording: 0s";
+ timers[id]=setInterval(()=>{sec++;if(sec>=MAX_DURATION){stopRecording(id);}else{document.getElementById(id+"-status").innerText="Recording: "+sec+"s";}},1000);
+ }).catch(err=>{alert("Mic error: "+err.message);});}
+function stopRecording(id){const r=recorders[id]?.recorder;if(r){r.requestData();r.stop();}}
+function openOverlay(m="⏳ Processing…",t="Please wait..."){document.getElementById("overlay-spinner").style.display="block";document.getElementById("overlay-title").innerText=m;document.getElementById("overlay-text").innerText=t;document.getElementById("overlay-close").style.display="none";document.getElementById("overlay").style.display="flex";}
+function updateOverlay(data){document.getElementById("overlay-spinner").style.display="none";if(data.error){document.getElementById("overlay-title").innerText="❌ Error";document.getElementById("overlay-text").innerText=data.error;document.getElementById("overlay-close").style.display="inline-block";return;}
+const verdict=data.similarity>0.9?"✅ Great match":data.similarity>0.7?"⚠️ Voice match":"❌ No match";
+let txt=`Raw similarity: ${data.similarity.toFixed(5)}\\n\\nSample 1 suspicion: ${data.analysis_sample1.suspicion}\\nFlags: ${data.analysis_sample1.flags.join(", ")}\\n\\nSample 2 suspicion: ${data.analysis_sample2.suspicion}\\nFlags: ${data.analysis_sample2.flags.join(", ")}`;
+document.getElementById("overlay-title").innerText=verdict;document.getElementById("overlay-text").innerText=txt;document.getElementById("overlay-close").style.display="inline-block";}
+function closeOverlay(){document.getElementById("overlay").style.display="none";}
+async function submitForm(){let f1=document.getElementById("file1").files[0]||recorders["rec1"]?.file;let f2=document.getElementById("file2").files[0]||recorders["rec2"]?.file;if(!f1||!f2){alert("Please provide both samples.");return;}
+openOverlay("⏳ Comparing voices…");let fd=new FormData();fd.append("file1",f1);fd.append("file2",f2);
+try{const resp=await fetch("/compare",{method:"POST",body:fd});if(!resp.ok)throw new Error("Server error "+resp.status);updateOverlay(await resp.json());}
+catch(err){updateOverlay({error:err.message});}} 
 </script>
-</body>
-</html>
-    """
+</body></html>"""
 
 
+# ----------------- Privacy, SEO -----------------
 @app.get("/privacy", response_class=HTMLResponse)
 def privacy():
-    return """
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>Privacy | Do You Trust My Voice</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>
-    body { font-family: 'Segoe UI', Tahoma, sans-serif; margin:0; padding:0; background:#f9fafb; color:#111; }
-    header { background: linear-gradient(90deg,#4f46e5,#3b82f6); color:white; padding:1.5rem; text-align:center; }
-    main { max-width:800px; margin:2rem auto; background:white; padding:2rem; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.05); }
-    h1 { color:#1e3a8a; }
-    p { line-height:1.6; }
-  </style>
-</head>
-<body>
-  <header>
-    <h1>Privacy & Legal Disclaimer</h1>
-  </header>
-  <main>
-    <p>We process audio only to compare similarity and analyze speech. Files are <strong>deleted immediately</strong> after processing. Data is processed in <strong>London (UK)</strong> and complies with <strong>GDPR</strong>.</p>
-    <p>By using this service, you consent to this temporary processing. Results are provided "as is" without warranty. You are responsible for how they are used.</p>
-  </main>
-</body>
-</html>
-    """
+    return """<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><title>Privacy | Do You Trust My Voice</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>body{font-family:'Segoe UI',Tahoma,sans-serif;margin:0;padding:0;background:#f9fafb;color:#111;}
+header{background:linear-gradient(90deg,#4f46e5,#3b82f6);color:white;padding:1.5rem;text-align:center;}
+main{max-width:800px;margin:2rem auto;background:white;padding:2rem;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.05);}h1{color:#1e3a8a;}p{line-height:1.6;}</style></head>
+<body><header><h1>Privacy & Legal Disclaimer</h1></header>
+<main><p>We process audio only to compare similarity and analyze speech. Files are <strong>deleted immediately</strong> after processing. Data is processed in <strong>London (UK)</strong> and complies with <strong>GDPR</strong>.</p>
+<p>By using this service, you consent to this temporary processing. Results are provided "as is" without warranty. You are responsible for how they are used.</p></main></body></html>"""
 
 
 @app.get("/sitemap.xml", response_class=HTMLResponse)
@@ -367,16 +299,12 @@ def sitemap():
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://doyoutrustmyvoice.com/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
   <url><loc>https://doyoutrustmyvoice.com/privacy</loc><changefreq>yearly</changefreq><priority>0.5</priority></url>
-</urlset>
-"""
+</urlset>"""
 
 
 @app.get("/robots.txt", response_class=HTMLResponse)
 def robots():
-    return """User-agent: *
-Allow: /
-Sitemap: https://doyoutrustmyvoice.com/sitemap.xml
-"""
+    return """User-agent: *\nAllow: /\nSitemap: https://doyoutrustmyvoice.com/sitemap.xml"""
 
 
 if __name__ == "__main__":
